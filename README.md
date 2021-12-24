@@ -1,4 +1,5 @@
 # Parallel-2
+First unzip the data folder  
 Running benchScript.sh compiles all the files and runs benchmarks with both random values and mnist data set  
 
 Running benchRand.sh compiles the rand variants and runs benchmarks with random values  
