@@ -5,7 +5,7 @@ Running benchRand.sh compiles the rand variants and runs benchmarks with random 
 
 Running benchMnist.sh compiles the Mnist variants and runs benchmarks with the Mnist dataset  
 
-if you want to run it yourself run benchScript to compile the files and run ./makeRand.out "number of points" "number of diamensions"  
+if you want to run it yourself run benchScript to compile the files and run ./makeRand.out "number of points" "number of diamensions"
 and then mpirun -np "number of processes" ./mpiRand.out "number of points" "number of diamensions"   
 
 
