@@ -163,13 +163,29 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 	
 	int smaller=0,bigger=0;
 	//printf("eimai o %d kai to meanQuick einai %f\n",my_id,meanQuick);
-	
-	for(int i = 0 ; i < length ; i++){
-		if( distances[i] < meanQuick ){
-			smaller++;
+	if(my_id <= (last+first)/2)
+	{
+		for(int i = 0 ; i < length ; i++)
+		{
+			if( distances[i] <= meanQuick )
+			{
+				smaller++;
+			}
 		}
+		bigger = length - smaller;
 	}
-	bigger = length - smaller;
+
+	else if(my_id >= (first+last)/2 + 1){
+		for(int i = 0 ; i < length ; i++)
+		{
+			if( distances[i] >= meanQuick )
+			{
+				bigger++;
+			}
+		}
+		smaller = length - bigger;
+	}
+	
 	
 	//printf("eimai o %d kai exw %d mikrotera kai %d megalutera\n",my_id,smaller,bigger);
 
@@ -198,7 +214,7 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 	}
 
 
-	if(my_id >= (first+last)/2 + 1){
+	else if(my_id >= (first+last)/2 + 1){
 
 		//printf("eimai o %d kai mphka sto mikroteroi prwtoi \n",my_id);
 		int	i = 0;
@@ -446,13 +462,13 @@ int main(int argc,char* argv[]){
 	distributeByMean(0,pivot, my_id, num_procs, N, d, vals, 0, num_procs-1);
 	
     
-    printf("pe gamwto ------------------------------------------------------------------------%d\n",my_id);
+    //printf("pe gamwto ------------------------------------------------------------------------%d\n",my_id);
 		
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (my_id == 0){
 		gettimeofday (&endwtime, NULL);
 		seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6 + endwtime.tv_sec - startwtime.tv_sec);
-		printf("\n\n-=-=-=-=-=-=-=-+++total time %f+++-=-=-=-=-=-=-=-=-=-\n\n",seq_time);
+		printf("\n\n-=-=-=-=-=-=-=-+++total time %f with %d points with %d dimensions and %d num_procs+++-=-=-=-=-=-=-=-=-=-\n\n",seq_time,N*num_procs,d,num_procs);
 		
 	}
 
@@ -479,7 +495,7 @@ int main(int argc,char* argv[]){
 		}
 	}
 
-	printf("\n\negw esti %d kai to elaxisto mou einai %f kai to megisto mou %f\n\n",my_id,min,max);
+	printf("\n\n id: %d minimum %f and maximum %f\n\n",my_id,min,max);
 
 	int check = 1;
 	if(my_id == 0){

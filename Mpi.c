@@ -438,7 +438,7 @@ int main(int argc,char* argv[]){
 	MPI_File_close(&file);
 			
 	
-    // αρχικα to kathena ena diabazei apo kapoio arxeio iso arithmo apo stoixeia 
+    	// αρχικα to kathena ena diabazei apo kapoio arxeio iso arithmo apo stoixeia 
 	// tha kanw kati gia auto ? arxika oti to kathena kanei ena pinaka me osa stoixeia prepei kai auto
 
 	float *pivot = (float*)malloc(d*sizeof(float));
@@ -446,13 +446,13 @@ int main(int argc,char* argv[]){
 	distributeByMean(0,pivot, my_id, num_procs, N, d, vals, 0, num_procs-1);
 	
     
-    printf("pe gamwto ------------------------------------------------------------------------%d\n",my_id);
+    //printf("I exited the function ------------------------------------------------------------------------%d\n",my_id);
 		
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (my_id == 0){
 		gettimeofday (&endwtime, NULL);
 		seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6 + endwtime.tv_sec - startwtime.tv_sec);
-		printf("\n\n-=-=-=-=-=-=-=-+++total time %f+++-=-=-=-=-=-=-=-=-=-\n\n",seq_time);
+		printf("\n\n-=-=-=-=-=-=-=-+++total time %f with %d points with %d dimensions and %d num_procs+++-=-=-=-=-=-=-=-=-=-\n\n",seq_time,N*num_procs,d,num_procs);
 		
 	}
 
@@ -479,7 +479,7 @@ int main(int argc,char* argv[]){
 		}
 	}
 
-	printf("\n\negw esti %d kai to elaxisto mou einai %f kai to megisto mou %f\n\n",my_id,min,max);
+	printf("\n\n id: %d minimum %f and maximum %f\n\n",my_id,min,max);
 
 	int check = 1;
 	if(my_id == 0){
