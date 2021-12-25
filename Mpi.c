@@ -67,36 +67,31 @@ int RandRange(int Min, int Max)
 }
 
 
-void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int length, int d, float* vals, int first, int last){
+void distributeByMedian(int iter,float* pivot, int my_id, int num_procs, int length, int d, float* vals, int first, int last){
 	float meanQuick;
 	float* distances;
-	//printf("caller %d entered distribute by mean with %d first an %d last on iter %d\n",my_id,first,last,iter);
 	MPI_Request request;
 	MPI_Status status;
 	
+	// if it enters on with itself inside it returns
 	if ( first == last ){
-		//printf("kati teleiwse--------------first %d---------last %d----------------------- \n",first,last);
 		return;
 	}
-	
+	// we assume that the first process every time is the leader
 	if( my_id == first ) {
-		//prepei na allazei o arxhgos kathe fora mexri na treksw me 2 ?
-		// pws tha to kanw auto 
-		// MPI_send fash
+		// if its the first iteration we have to pick a pivot
 		if(iter == 0){
 			int pivotIndex = RandRange(0 ,length-1);
 			for(int i = 0 ; i < d ; i++){
 				pivot[i] = vals[pivotIndex*d + i];
-				//printf("%f tuxaio index %d to to valpivot tou i\n",vals[0 + i],pivotIndex);
 			}
 			
 			for(int i = first + 1 ; i < last + 1 ; i++ ){
-				// send to everyone 
+				// send pivot to everyone 
 				MPI_Send(pivot,d,MPI_FLOAT,i,1,MPI_COMM_WORLD);
 			}
 		}
 
-		//printf("%d asked people to do work with pivot 1 %f %d \n",my_id,vals[pivot][1],pivot);
 		distances = (float*)malloc(length*sizeof(float));
 		float* meanD = (float*)malloc(length*num_procs*sizeof(float));
 		
@@ -116,17 +111,12 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 			MPI_Recv(&meanD[(i-first)*length],length,MPI_FLOAT,i,1,MPI_COMM_WORLD,&status);
 		}
 		
-		for( int i = 0 ; i < length*num_procs ; i ++){
-			//printf("%d oi id %d meses times einai %f\n" ,i,my_id, meanD[i]);
-		}
-		//printf(" to mhkos pou edwsa einai %d\n",length*num_procs);
 		float q1 = kthSmallest(meanD,0,length*num_procs-1,length*num_procs/2 + 1);
 		float q2 = kthSmallest(meanD,0,length*num_procs-1,length*num_procs/2 );
 		meanQuick = (q1+q2)/2;
 		
-		//printf("\n\n+++++++++++++ diamesos einai %f apo q1 %f kai q2 %f ++++++++++++++++ \n \n",meanQuick, q1,q2);
 		for(int i = first + 1 ; i < last + 1 ; i++ ){
-			// recv from everyone 
+			// send the median to everyone from everyone 
 			MPI_Send(&meanQuick,1,MPI_FLOAT,i,1,MPI_COMM_WORLD);
 		}
 		free(meanD);
@@ -138,32 +128,29 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 			// recieve from leader
 			MPI_Recv(pivot,d,MPI_FLOAT,first,1,MPI_COMM_WORLD,&status);
 			
-			//printf("lambanw douleia %d %f\n", my_id,pivot[0]);
 		}
 
 		distances = (float*)malloc(length*sizeof(float));
-
+		//we calculate the distances to the pivot from every point
 		for(int i = 0 ; i < length ; i++){
 			float s = 0;
 			for(int k = 0 ; k < d ; k++){
 				s += pow(vals[i*d+k]-pivot[k],2);
 			}
 			distances[i] = s;
-			//printf("i'm %d and for i %d my mean dist is %f\n", my_id, i , distances[i]);
 		}
-		
+		// send them to the leader
 		MPI_Send(distances,length,MPI_FLOAT,first,1,MPI_COMM_WORLD);
-
+		
+	    	//recieve the median
 		MPI_Recv(&meanQuick,1,MPI_FLOAT,first,1,MPI_COMM_WORLD,&status);
-		// printf("eimai o %d kai ematha oti h diamesos einai %f\n", my_id,meanQuick);
 		
     }
 	
-	// mporw na dokimasw na kanw tis prakseis apo olous mazi kai na xrhsimopoihsw to gather gia na ta mazepsw
+
 	
 	int smaller=0,bigger=0;
-	//printf("eimai o %d kai to meanQuick einai %f\n",my_id,meanQuick);
-	
+	// find how many smaller and bigger points we have compared to pivot
 	for(int i = 0 ; i < length ; i++){
 		if( distances[i] < meanQuick ){
 			smaller++;
@@ -171,14 +158,13 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 	}
 	bigger = length - smaller;
 	
-	//printf("eimai o %d kai exw %d mikrotera kai %d megalutera\n",my_id,smaller,bigger);
+	//we can skip everything if we have 0 points to trade
 
 	if( !(((my_id <= (last+first)/2) && (bigger == 0)) || ((my_id >= (first+last)/2 + 1) && (smaller == 0))) ){
 
-	//printf("\n");
 	
+	// partition the points of each process
 	if(my_id <= (last+first)/2){
-		//printf("eimai o %d kai mphka sto megaluteroi prwtoi \n",my_id);
 
 		int	i = 0;
     	for (int j = 0; j <= length - 1; j++) {
@@ -197,10 +183,10 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 
 	}
 
-
+	// partition the points
 	if(my_id >= (first+last)/2 + 1){
 
-		//printf("eimai o %d kai mphka sto mikroteroi prwtoi \n",my_id);
+		
 		int	i = 0;
     	for (int j = 0; j <= length-1; j++) {
         	if (distances[j] < meanQuick) {
@@ -223,22 +209,16 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 	if(my_id == first){
 		// recieve from everyone what they want to trade
 
-		// NA THUMITHW NA KOITAKSW AUTO POU BRHKA POY XREIAZETAI NA BALW TO i-FIRST STHN ANADROMH THA GINEI MEGAAALH PIPA
-
 		int* toTrade = (int*)malloc(sizeof(int)*(last-first+1));
 		toTrade[0]=bigger;
-		//printf("%d has %d to trade\n",my_id,toTrade[0]);
 
 		for(int i = first + 1 ; i < last + 1 ; i++ ){
-			// recv from everyone 
-			//printf("paw na dextw apo ton %d\n",i);
+			// recv from everyone how many points they have to trade
 			MPI_Recv(&toTrade[i-first],1,MPI_INT,i,1,MPI_COMM_WORLD,&status);
-			//printf("%d has %d to trade\n",i,toTrade[i-first]);
 		}
-		//printf("bghka apo thn lipsi posa exoun na steiloun\n\n");
 
 		// o arxhgos tha exei 2 counters/pointers kai tha stelnei se olous me poious na kanoun antallages, aytoi tha kanoyn mexri na tous teleiwsoun ta stoixeia an einai o idios aytos tha kanei aplws to trade
-		// sToTrade shows the start of those to give small and psajfiajfp
+		// sToTrade shows the start of those to give smaller points than the median and bToTrade shows the start of those to give bigger points than the median
 
 		int bToTrade = first; 
 		while(toTrade[bToTrade - first] == 0 && bToTrade < (first+last)/2 + 1){
@@ -254,17 +234,14 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 
 		int srStart = 0;
 
-		//printf("to bToTrade einai %d kai toTrade[bToTrade] einai %d to sToTrade einai %d kai toTrade[sToTrade] einai %d\n",bToTrade,toTrade[bToTrade],sToTrade,toTrade[sToTrade]);
+		
 		// tha antallaksoun ta perissotera pithana
-		//printf("toTrade[(first+last)/2-first] einai iso me %d kai toTrade[last-first] = %d \n",toTrade[(first+last)/2-first],toTrade[last-first]);
-
-		// AMA KATI PAEI POLY LATHOS PSAKSE EDW
+		
 		
 		while(sToTrade <=last && bToTrade < ((first+last)/2 + 1)){
 			
 		// tha antallaksoun ta perissotera pithana
 			
-			//printf("uparxoun akoma stoixeia pou prepei na antallagoun\n");
 			if(toTrade[sToTrade - first]<toTrade[bToTrade - first]){
 				tempNumToTrade = toTrade[sToTrade - first];
 				toTrade[sToTrade - first] = 0;
@@ -276,11 +253,7 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 				toTrade[bToTrade - first] = 0;
 				toTrade[sToTrade - first] -= tempNumToTrade;
 			}
-			// ara prepei na antallaksoume tempNumTrade stoixeia to btoTrade me to sToTrade
-			// printf("Mesa sto id %d WHILE toTrade[(first+last)/2-first] einai iso me %d kai toTrade[last-first] = %d \n",my_id,toTrade[(first+last)/2-first],toTrade[last-first]);
-			// printf("Mesa sto id %d WHILE to bToTrade einai %d kai toTrade[bToTrade] einai %d to sToTrade einai %d kai toTrade[sToTrade] einai %d \n",my_id,bToTrade,toTrade[bToTrade],sToTrade,toTrade[sToTrade]);
-			
-			// printf("tha ginei id %d antallagh %d stoixeiwn\n",my_id,tempNumToTrade);
+		
 
 			//posa tha antallakseis
 			MPI_Send(&tempNumToTrade,1,MPI_INT,sToTrade,1,MPI_COMM_WORLD);
@@ -300,7 +273,7 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 				MPI_Send(&tempNumToTrade,1,MPI_INT,bToTrade,1,MPI_COMM_WORLD);
 				MPI_Send(&sToTrade,1,MPI_INT,bToTrade,1,MPI_COMM_WORLD);
 			}
-
+				// if they run out of points to send the counter gets to the next process
 			if(toTrade[sToTrade - first] == 0)
 				sToTrade++;
 
@@ -310,32 +283,30 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 	}
 
 	// enas apo tous duo tha xreiastei na apothukeusei kapou proswrina ta shmeia pou tha antikatastathoun
+	// they temporarily save the points to an array
 
 	else if(my_id > first && (my_id <= (last+first)/2) ){
-		//printf("I'm %d kai stelnw ta megalutera stoixeia mou\n",my_id);
-
-		//MPI_Isend(&bigger,1,MPI_INT,first,1,MPI_COMM_WORLD);
+		
 		MPI_Send(&bigger,1,MPI_INT,first,1,MPI_COMM_WORLD);
 
 		// which points to send or where to put the recieving points
 		int srStart = 0;
 
 		while(bigger != 0 ){
-			//printf("%d mphka sthn loupa epeidh exw %d bigger",my_id,bigger);
+			
 			int tradeWith, tradeNums;
 			// oso exei stoixeia na antallaksei tha perimenei na labei me poion tha antallaksei
 			MPI_Recv(&tradeNums,1,MPI_INT,first,1,MPI_COMM_WORLD,&status);
 			// kai posa stoixeia tha antallaksei me auton
 			MPI_Recv(&tradeWith,1,MPI_INT,first,1,MPI_COMM_WORLD,&status);
 			
-			//printf("tha antallaksw %d stoixeia me ton %d",tradeNums,tradeWith);
 
 
 			MPI_Send(&vals[srStart*d],tradeNums*d,MPI_FLOAT,tradeWith,1,MPI_COMM_WORLD);
 
 			MPI_Recv(&vals[srStart*d],tradeNums*d,MPI_FLOAT,tradeWith,1,MPI_COMM_WORLD,&status);
 
-
+			// update where to put files and how many they have to trade
 			srStart = srStart + tradeNums;
 			bigger -= tradeNums;
 
@@ -352,7 +323,7 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 		int srStart = 0 ;
 
 		while(smaller != 0){
-			//printf("%d mphka sthn loupa epeidh exw %d smaller",my_id,smaller);
+			
 			int tradeWith, tradeNums;
 			// oso exei stoixeia na antallaksei tha perimenei na labei me poion tha antallaksei
 			MPI_Recv(&tradeNums,1,MPI_INT,first,1,MPI_COMM_WORLD,&status);
@@ -368,7 +339,7 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 			for(int l = 0 ; l < d*tradeNums ; l++ ){
 				vals[srStart*d + l] = tempPoints[l];
 			}
-
+			// update where to put files and how many they have to trade
 			free(tempPoints);
 			srStart = srStart + tradeNums;
 			smaller -= tradeNums;
@@ -378,25 +349,14 @@ void distributeByMean(int iter,float* pivot, int my_id, int num_procs, int lengt
 
 	}
 
-	//ypologizw ksana tis apostaseis gia na dw ama eginan ta trades xwris na steilw tis apostaseis
-
-	
-	// antallaksa osa eixa mwre
-	// prepei edw na perimenoun kathe fora oses sumetexoun 
-	// den thumamai pws to kanw auto 
-	
-
 	free(distances);
 	
 	
 	if(my_id >= first && my_id <= (last+first)/2 )
-		distributeByMean(++iter, pivot, my_id, num_procs/2, length, d, vals, first, (first + last)/2);
+		distributeByMedian(++iter, pivot, my_id, num_procs/2, length, d, vals, first, (first + last)/2);
 	if( my_id >= (first+last)/2 + 1 && my_id <= last)
-		distributeByMean(++iter, pivot, my_id, num_procs/2, length, d, vals, (first+last)/2 + 1 , last);
+		distributeByMedian(++iter, pivot, my_id, num_procs/2, length, d, vals, (first+last)/2 + 1 , last);
 	
-
-	// sto telos stelnw ston prohgoumeno arxhgo to diko mou tmhma ?
-	// kai o arxikos arxhgos tha kserei oloklhro ton pinaka kai tha ton epistrefei h kati , h tha einai o dikos tou allagmenos ?
 	
 }
 
@@ -412,7 +372,7 @@ int main(int argc,char* argv[]){
     ierr = MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 	
 	if(argc < 3){
-		printf("bale 2 orismata re lulu, arithmo stoixeiwn kai diastash");
+		printf("use 2 arguments, how many points and what dimension");
 		return 0;
 	}
 	
@@ -422,10 +382,8 @@ int main(int argc,char* argv[]){
 	N = N/num_procs ;
     
 
-	// prepei na grapsw ena arxeio kai na to diabazw edw mesa o kathenas ta dika toy 
-	// mporw na kanw ena allo c gia na diabazw kai auto aplws na ta diabazei kai na kanei ena akoma arxeio 
 	
-	// prepei ola na paroun ta arxeia tous apo to file pou eftiakse o 0
+	// Every file reads its appropriate points from the file makeRand.c created
 	
 	float* vals = (float*)malloc(sizeof(float)*N*d);
 	
@@ -438,16 +396,14 @@ int main(int argc,char* argv[]){
 	MPI_File_close(&file);
 			
 	
-    	// αρχικα to kathena ena diabazei apo kapoio arxeio iso arithmo apo stoixeia 
-	// tha kanw kati gia auto ? arxika oti to kathena kanei ena pinaka me osa stoixeia prepei kai auto
-
+	// Initialization of pivot
 	float *pivot = (float*)malloc(d*sizeof(float));
 	gettimeofday (&startwtime, NULL);
-	distributeByMean(0,pivot, my_id, num_procs, N, d, vals, 0, num_procs-1);
+	distributeByMedian(0,pivot, my_id, num_procs, N, d, vals, 0, num_procs-1);
 	
     
-    //printf("I exited the function ------------------------------------------------------------------------%d\n",my_id);
-		
+    
+	//wait for everyone to return	
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (my_id == 0){
 		gettimeofday (&endwtime, NULL);
@@ -456,7 +412,7 @@ int main(int argc,char* argv[]){
 		
 	}
 
-
+	// calculate all the distances to find out if our results are correct
 	float* distances = (float*)malloc(sizeof(float)*N);
 	
 	for(int i = 0 ; i < N ; i++){
@@ -465,7 +421,7 @@ int main(int argc,char* argv[]){
 			s += pow(vals[i*d+k]-pivot[k],2);
 		}
 		distances[i] = sqrt(s);
-		//printf("i'm %d and for i %d my dist from pivot is %f\n", my_id, i , distances[i]);
+		
 	}
 
 	float max = -1;
@@ -478,7 +434,7 @@ int main(int argc,char* argv[]){
 			max = distances[i];
 		}
 	}
-
+	
 	printf("\n\n id: %d minimum %f and maximum %f\n\n",my_id,min,max);
 
 	int check = 1;
@@ -486,7 +442,7 @@ int main(int argc,char* argv[]){
 		float* minmaxs = (float*)malloc(2*num_procs*sizeof(float));
 		minmaxs[0] = min;
 		minmaxs[1] = max;
-		for(int l = 1 ; l < num_procs ; l++){
+		for(int l = 1 ; l < num_procs ; l++){ // recieve mins and maxs
 			MPI_Recv(&minmaxs[2*l],1,MPI_FLOAT,l,1,MPI_COMM_WORLD,&status);
 			MPI_Recv(&minmaxs[2*l+1],1,MPI_FLOAT,l,1,MPI_COMM_WORLD,&status);
 		}
@@ -502,7 +458,7 @@ int main(int argc,char* argv[]){
 			printf("Something went wrong with trading\n");
 
 	}
-	else{
+	else{ // the other processes send their mins and maxs
 		MPI_Send(&min,1,MPI_FLOAT,0,1,MPI_COMM_WORLD);
 		MPI_Send(&max,1,MPI_FLOAT,0,1,MPI_COMM_WORLD);
 	}
