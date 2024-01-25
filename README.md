@@ -1,4 +1,7 @@
-# Parallel-2
+# MPI Parallel Computing Project
+
+### Parallel computing project using MPI in order to sort the points and distribute them across the nodes. Succesfully running at multinode cluster.
+
 First unzip the data folder  
 Running benchScript.sh compiles all the files and runs benchmarks with both random values and mnist data set  
 
